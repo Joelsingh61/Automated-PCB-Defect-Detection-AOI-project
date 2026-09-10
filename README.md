@@ -25,7 +25,7 @@ Confidence Score
     ↓
 Quality Inspection
 
-# Objectives
+### Objectives
 Automate PCB visual inspection using computer vision
 Detect common PCB manufacturing defects
 Classify defects into different categories
