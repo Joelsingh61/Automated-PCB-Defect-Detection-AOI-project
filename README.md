@@ -25,14 +25,15 @@ Confidence Score
     ↓
 Quality Inspection
 
-🎯 Objectives
+# Objectives
 Automate PCB visual inspection using computer vision
 Detect common PCB manufacturing defects
 Classify defects into different categories
 Localize defects using bounding boxes
 Measure model performance using precision, recall and mAP
 Demonstrate the use of AI in electronics manufacturing quality inspection
-🧠 Defects Detected
+
+## Defects Detected
 
 The model detects six PCB defect classes:
 
