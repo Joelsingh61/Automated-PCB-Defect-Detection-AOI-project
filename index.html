@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI-Based PCB Defect Detection | Joel Singh</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif']
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s ease-in-out infinite',
+                        'fade-up': 'fadeUp 0.8s ease-out forwards'
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-12px)' }
+                        },
+                        fadeUp: {
+                            '0%': {
+                                opacity: '0',
+                                transform: 'translateY(25px)'
+                            },
+                            '100%': {
+                                opacity: '1',
+                                transform: 'translateY(0)'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #050816;
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .glow {
+            box-shadow:
+                0 0 30px rgba(59, 130, 246, 0.12),
+                0 0 80px rgba(59, 130, 246, 0.05);
+        }
+
+        .grid-bg {
+            background-image:
+                linear-gradient(rgba(59,130,246,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.05) 1px, transparent 1px);
+            background-size: 45px 45px;
+        }
+
+        .text-gradient {
+            background: linear-gradient(90deg, #60a5fa, #22d3ee, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .scan-line {
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                transform: translateY(0);
+                opacity: 0;
+            }
+            15% {
+                opacity: 1;
+            }
+            85% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(280px);
+                opacity: 0;
+            }
+        }
+
+        .timeline-line {
+            background: linear-gradient(
+                to bottom,
+                #3b82f6,
+                #06b6d4,
+                #8b5cf6
+            );
+        }
+    </style>
+</head>
+
+<body class="text-slate-200">
+
+<!-- ========================================================= -->
+<!-- NAVIGATION -->
+<!-- ========================================================= -->
+
+<nav class="fixed top-0 left-0 right-0 z-50 glass">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-400/20 flex items-center justify-center">
+                <span class="text-blue-400 font-black">AI</span>
+            </div>
+
+            <div>
+                <p class="font-bold text-white">PCB Vision</p>
+                <p class="text-xs text-slate-500">Automated Optical Inspection</p>
+            </div>
+        </div>
+
+        <div class="hidden md:flex items-center gap-7 text-sm text-slate-400">
+            <a href="#overview" class="hover:text-white transition">Overview</a>
+            <a href="#pipeline" class="hover:text-white transition">Pipeline</a>
+            <a href="#defects" class="hover:text-white transition">Defects</a>
+            <a href="#results" class="hover:text-white transition">Results</a>
+            <a href="#technology" class="hover:text-white transition">Technology</a>
+        </div>
+
+        <a href="#results"
+           class="hidden sm:block px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold transition">
+            View Results
+        </a>
+
+    </div>
+</nav>
+
+
+<!-- ========================================================= -->
+<!-- HERO -->
+<!-- ========================================================= -->
+
+<section class="relative min-h-screen flex items-center overflow-hidden grid-bg">
+
+    <!-- Background glow -->
+    <div class="absolute top-20 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-10 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+
+    <div class="relative max-w-7xl mx-auto px-6 pt-28 pb-20 grid lg:grid-cols-2 gap-16 items-center">
+
+        <!-- LEFT -->
+        <div>
+
+            <div class="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-blue-400/20 bg-blue-400/5 text-blue-300 text-sm mb-7">
+                <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+                Computer Vision • Automated Optical Inspection
+            </div>
+
+            <h1 class="text-5xl md:text-7xl font-black leading-tight tracking-tight">
+                AI-Based
+                <span class="text-gradient">PCB Defect</span>
+                Detection
+            </h1>
+
+            <p class="mt-7 text-lg md:text-xl text-slate-400 max-w-xl leading-relaxed">
+                An automated optical inspection system using
+                <strong class="text-white">YOLO26n</strong>,
+                Python and OpenCV to identify and localize defects
+                on printed circuit boards.
+            </p>
+
+            <div class="flex flex-wrap gap-3 mt-8">
+
+                <span class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                    YOLO26n
+                </span>
+
+                <span class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                    Python
+                </span>
+
+                <span class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                    OpenCV
+                </span>
+
+                <span class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                    Deep Learning
+                </span>
+
+            </div>
+
+            <div class="flex gap-4 mt-10">
+
+                <a href="#pipeline"
+                   class="px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-semibold transition">
+                    Explore Project →
+                </a>
+
+                <a href="#results"
+                   class="px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 transition">
+                    Performance
+                </a>
+
+            </div>
+
+        </div>
+
+
+        <!-- RIGHT PCB VISUAL -->
+        <div class="relative animate-float">
+
+            <div class="glass glow rounded-3xl p-5">
+
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase tracking-widest">
+                            Inspection Preview
+                        </p>
+                        <p class="font-semibold text-white">
+                            PCB / Detection Output
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2 text-xs text-emerald-400">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        LIVE
+                    </div>
+                </div>
+
+
+                <!-- PCB SVG -->
+                <div class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
+
+                    <svg viewBox="0 0 700 480"
+                         class="w-full h-auto">
+
+                        <!-- PCB -->
+                        <rect x="40" y="30"
+                              width="620"
+                              height="420"
+                              rx="25"
+                              fill="#0b3b32"
+                              stroke="#1f806d"
+                              stroke-width="5"/>
+
+                        <!-- PCB traces -->
+                        <g stroke="#5eead4"
+                           stroke-width="4"
+                           fill="none"
+                           opacity="0.55">
+
+                            <path d="M80 110 H250 V180 H360"/>
+                            <path d="M110 330 H260 V270 H500"/>
+                            <path d="M390 70 V150 H590"/>
+                            <path d="M450 390 V300 H610"/>
+                            <path d="M160 70 V210 H280"/>
+                            <path d="M550 100 V250 H430"/>
+                        </g>
+
+                        <!-- Components -->
+                        <g fill="#1e293b" stroke="#94a3b8">
+
+                            <rect x="110" y="130" width="90" height="55" rx="6"/>
+                            <rect x="330" y="80" width="105" height="65" rx="6"/>
+                            <rect x="470" y="190" width="100" height="65" rx="6"/>
+                            <rect x="170" y="290" width="110" height="60" rx="6"/>
+                            <rect x="370" y="320" width="90" height="55" rx="6"/>
+
+                        </g>
+
+                        <!-- Pins -->
+                        <g fill="#fbbf24">
+
+                            <circle cx="125" cy="120" r="5"/>
+                            <circle cx="145" cy="120" r="5"/>
+                            <circle cx="165" cy="120" r="5"/>
+                            <circle cx="185" cy="120" r="5"/>
+
+                            <circle cx="350" cy="70" r="5"/>
+                            <circle cx="375" cy="70" r="5"/>
+                            <circle cx="400" cy="70" r="5"/>
+                            <circle cx="425" cy="70" r="5"/>
+
+                        </g>
+
+                        <!-- Defect box: open -->
+                        <rect x="85" y="95"
+                              width="130"
+                              height="105"
+                              fill="none"
+                              stroke="#ef4444"
+                              stroke-width="4"
+                              stroke-dasharray="10 7"/>
+
+                        <text x="85"
+                              y="88"
+                              fill="#f87171"
+                              font-size="18"
+                              font-weight="bold">
+                            OPEN 0.94
+                        </text>
+
+
+                        <!-- Defect box: short -->
+                        <rect x="445" y="175"
+                              width="145"
+                              height="100"
+                              fill="none"
+                              stroke="#f59e0b"
+                              stroke-width="4"
+                              stroke-dasharray="10 7"/>
+
+                        <text x="445"
+                              y="168"
+                              fill="#fbbf24"
+                              font-size="18"
+                              font-weight="bold">
+                            SHORT 0.91
+                        </text>
+
+
+                        <!-- Scan line -->
+                        <rect x="40"
+                              y="30"
+                              width="620"
+                              height="4"
+                              fill="#38bdf8"
+                              opacity="0.8"
+                              class="scan-line"/>
+
+                    </svg>
+
+                    <div class="absolute bottom-4 left-4 right-4 flex justify-between">
+
+                        <div class="px-3 py-2 rounded-lg bg-black/60 backdrop-blur text-xs">
+                            Image: PCB_0042
+                        </div>
+
+                        <div class="px-3 py-2 rounded-lg bg-black/60 backdrop-blur text-xs text-emerald-300">
+                            2 defects detected
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PROJECT OVERVIEW -->
+<!-- ========================================================= -->
+
+<section id="overview" class="py-28 bg-slate-950/70">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="max-w-3xl mb-16">
+
+            <p class="text-blue-400 font-semibold uppercase tracking-widest text-sm">
+                01 — Project Overview
+            </p>
+
+            <h2 class="text-4xl md:text-5xl font-black mt-4 text-white">
+                Replacing manual PCB inspection with
+                <span class="text-gradient">AI-powered vision</span>
+            </h2>
+
+            <p class="text-slate-400 text-lg mt-6 leading-relaxed">
+                Printed circuit boards contain tiny defects that can affect
+                electrical performance and manufacturing quality. Manual
+                inspection is time-consuming and can be inconsistent.
+                This project explores an automated computer-vision approach
+                capable of detecting and localizing PCB defects.
+            </p>
+
+        </div>
+
+
+        <div class="grid md:grid-cols-3 gap-6">
+
+            <!-- Problem -->
+            <div class="glass rounded-2xl p-7 hover:-translate-y-2 transition duration-300">
+
+                <div class="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 text-xl">
+                    !
+                </div>
+
+                <h3 class="text-xl font-bold text-white mt-6">
+                    The Problem
+                </h3>
+
+                <p class="text-slate-400 mt-4 leading-relaxed">
+                    Manual PCB inspection requires time, skilled operators
+                    and can miss small or visually complex defects.
+                </p>
+
+            </div>
+
+
+            <!-- Solution -->
+            <div class="glass rounded-2xl p-7 hover:-translate-y-2 transition duration-300">
+
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
+                    AI
+                </div>
+
+                <h3 class="text-xl font-bold text-white mt-6">
+                    The Solution
+                </h3>
+
+                <p class="text-slate-400 mt-4 leading-relaxed">
+                    A YOLO-based object detection model identifies PCB
+                    defects directly from inspection images and produces
+                    bounding boxes with confidence scores.
+                </p>
+
+            </div>
+
+
+            <!-- Impact -->
+            <div class="glass rounded-2xl p-7 hover:-translate-y-2 transition duration-300">
+
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                    ✓
+                </div>
+
+                <h3 class="text-xl font-bold text-white mt-6">
+                    Industrial Impact
+                </h3>
+
+                <p class="text-slate-400 mt-4 leading-relaxed">
+                    Automated inspection can support faster quality checks,
+                    defect localization and more consistent inspection
+                    workflows in electronics manufacturing.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- DATASET -->
+<!-- ========================================================= -->
+
+<section class="py-24">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="grid lg:grid-cols-2 gap-16 items-center">
+
+            <div>
+
+                <p class="text-cyan-400 font-semibold uppercase tracking-widest text-sm">
+                    02 — Dataset
+                </p>
+
+                <h2 class="text-4xl font-black text-white mt-4">
+                    Training the model to understand PCB defects
+                </h2>
+
+                <p class="text-slate-400 mt-6 leading-relaxed text-lg">
+                    The project uses the DeepPCB dataset containing
+                    annotated PCB images. Defects are represented using
+                    bounding-box annotations, allowing the model to learn
+                    both <strong class="text-white">what</strong> the defect
+                    is and <strong class="text-white">where</strong> it occurs.
+                </p>
+
+                <div class="grid grid-cols-2 gap-4 mt-8">
+
+                    <div class="glass rounded-xl p-5">
+                        <p class="text-3xl font-black text-white">1,500</p>
+                        <p class="text-sm text-slate-500 mt-1">Images</p>
+                    </div>
+
+                    <div class="glass rounded-xl p-5">
+                        <p class="text-3xl font-black text-white">6</p>
+                        <p class="text-sm text-slate-500 mt-1">Defect Classes</p>
+                    </div>
+
+                    <div class="glass rounded-xl p-5">
+                        <p class="text-3xl font-black text-white">150</p>
+                        <p class="text-sm text-slate-500 mt-1">Unseen Test Images</p>
+                    </div>
+
+                    <div class="glass rounded-xl p-5">
+                        <p class="text-3xl font-black text-white">1,005</p>
+                        <p class="text-sm text-slate-500 mt-1">Test Defects</p>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- DATA VISUAL -->
+            <div class="glass rounded-3xl p-8 glow">
+
+                <div class="flex justify-between mb-8">
+
+                    <div>
+                        <p class="text-xs uppercase tracking-widest text-slate-500">
+                            Dataset Distribution
+                        </p>
+                        <p class="text-xl font-bold text-white mt-1">
+                            Defect Categories
+                        </p>
+                    </div>
+
+                    <div class="text-cyan-400 text-sm font-semibold">
+                        6 Classes
+                    </div>
+
+                </div>
+
+                <div class="space-y-5">
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Open</span>
+                            <span class="text-slate-500">Class 01</span>
+                        </div>
+                        <div class="h-2 bg-slate-800 rounded-full">
+                            <div class="h-full rounded-full bg-blue-400 w-[82%]"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Short</span>
+                            <span class="text-slate-500">Class 02</span>
+                        </div>
+                        <div class="h-2 bg-slate-800 rounded-full">
+                            <div class="h-full rounded-full bg-cyan-400 w-[74%]"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Mousebite</span>
+                            <span class="text-slate-500">Class 03</span>
+                        </div>
+                        <div class="h-2 bg-slate-800 rounded-full">
+                            <div class="h-full rounded-full bg-purple-400 w-[68%]"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Spur</span>
+                            <span class="text-slate-500">Class 04</span>
+                        </div>
+                        <div class="h-2 bg-slate-800 rounded-full">
+                            <div class="h-full rounded-full bg-indigo-400 w-[62%]"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Pin-hole</span>
+                            <span class="text-slate-500">Class 05</span>
+                        </div>
+                        <div class="h-2 bg-slate-800 rounded-full">
+                            <div class="h-full rounded-full bg-emerald-400 w-[55%]"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Spurious Copper</span>
+                            <span class="text-slate-500">Class 06</span>
+                        </div>
+                        <div class="h-2 bg-slate-800 rounded-full">
+                            <div class="h-full rounded-full bg-amber-400 w-[48%]"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- DEFECT TYPES -->
+<!-- ========================================================= -->
+
+<section id="defects" class="py-28 bg-slate-950/70">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="text-center max-w-3xl mx-auto">
+
+            <p class="text-purple-400 font-semibold uppercase tracking-widest text-sm">
+                03 — Defect Classification
+            </p>
+
+            <h2 class="text-4xl md:text-5xl font-black text-white mt-4">
+                Six PCB defects.
+                <span class="text-gradient">One vision system.</span>
+            </h2>
+
+        </div>
+
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-14">
+
+            <!-- Defect card -->
+            <div class="glass rounded-2xl p-6 group hover:border-blue-400/30 transition">
+
+                <div class="h-36 rounded-xl bg-slate-900 flex items-center justify-center relative overflow-hidden">
+
+                    <div class="absolute inset-8 border-2 border-red-400 border-dashed rounded-lg"></div>
+
+                    <div class="w-16 h-5 bg-slate-700 rounded"></div>
+
+                    <span class="absolute top-3 left-3 text-xs text-red-400">
+                        DETECTED
+                    </span>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-white mt-5">
+                    Open
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-2">
+                    Broken or disconnected conductive trace.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 group hover:border-blue-400/30 transition">
+
+                <div class="h-36 rounded-xl bg-slate-900 flex items-center justify-center relative overflow-hidden">
+
+                    <div class="w-28 h-2 bg-amber-400 rounded rotate-12"></div>
+                    <div class="w-28 h-2 bg-amber-400 rounded -rotate-12 absolute"></div>
+
+                    <div class="absolute inset-6 border-2 border-amber-400 border-dashed rounded-lg"></div>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-white mt-5">
+                    Short
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-2">
+                    Unintended connection between conductive paths.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 group hover:border-blue-400/30 transition">
+
+                <div class="h-36 rounded-xl bg-slate-900 flex items-center justify-center">
+
+                    <div class="grid grid-cols-5 gap-2">
+                        <span class="w-3 h-3 bg-cyan-400 rounded-full"></span>
+                        <span class="w-3 h-3 bg-cyan-400 rounded-full"></span>
+                        <span class="w-3 h-3 bg-cyan-400 rounded-full"></span>
+                        <span class="w-3 h-3 bg-cyan-400 rounded-full"></span>
+                        <span class="w-3 h-3 bg-red-400 rounded-full"></span>
+                    </div>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-white mt-5">
+                    Mousebite
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-2">
+                    Irregular edge damage resembling bite marks.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 group hover:border-blue-400/30 transition">
+
+                <div class="h-36 rounded-xl bg-slate-900 flex items-center justify-center">
+
+                    <div class="w-28 h-5 bg-emerald-500/30 border border-emerald-400 rounded relative">
+                        <div class="absolute right-0 top-0 h-full w-5 bg-red-400"></div>
+                    </div>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-white mt-5">
+                    Spur
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-2">
+                    Unwanted copper extension from a conductive trace.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 group hover:border-blue-400/30 transition">
+
+                <div class="h-36 rounded-xl bg-slate-900 flex items-center justify-center">
+
+                    <div class="w-14 h-14 rounded-full border-4 border-cyan-400 relative">
+                        <div class="absolute w-2 h-2 rounded-full bg-red-400 top-4 left-4"></div>
+                    </div>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-white mt-5">
+                    Pin-hole
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-2">
+                    Small unwanted hole or void in the PCB structure.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 group hover:border-blue-400/30 transition">
+
+                <div class="h-36 rounded-xl bg-slate-900 flex items-center justify-center relative">
+
+                    <div class="w-28 h-4 bg-yellow-400 rounded"></div>
+
+                    <div class="absolute w-4 h-4 bg-red-400 rounded-full top-7 left-20"></div>
+                    <div class="absolute w-3 h-3 bg-red-400 rounded-full bottom-7 left-32"></div>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-white mt-5">
+                    Spurious Copper
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-2">
+                    Unwanted copper remaining in non-conductive regions.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PIPELINE -->
+<!-- ========================================================= -->
+
+<section id="pipeline" class="py-28">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="max-w-3xl">
+
+            <p class="text-blue-400 font-semibold uppercase tracking-widest text-sm">
+                04 — Detection Pipeline
+            </p>
+
+            <h2 class="text-4xl md:text-5xl font-black text-white mt-4">
+                From PCB image to
+                <span class="text-gradient">defect decision</span>
+            </h2>
+
+            <p class="text-slate-400 mt-5 text-lg">
+                The complete workflow combines image processing,
+                deep learning and object detection.
+            </p>
+
+        </div>
+
+
+        <div class="relative mt-16">
+
+            <!-- Vertical line -->
+            <div class="hidden md:block absolute left-8 top-0 bottom-0 w-px timeline-line"></div>
+
+
+            <div class="space-y-12">
+
+                <!-- Step 1 -->
+                <div class="relative md:pl-24">
+
+                    <div class="hidden md:flex absolute left-0 top-0 w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-400/20 items-center justify-center text-blue-400 font-black text-xl">
+                        01
+                    </div>
+
+                    <div class="glass rounded-2xl p-7">
+
+                        <h3 class="text-2xl font-bold text-white">
+                            Input PCB Image
+                        </h3>
+
+                        <p class="text-slate-400 mt-3 leading-relaxed">
+                            A PCB inspection image is provided to the computer
+                            vision pipeline. The image acts as the input for
+                            automated quality inspection.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Step 2 -->
+                <div class="relative md:pl-24">
+
+                    <div class="hidden md:flex absolute left-0 top-0 w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-400/20 items-center justify-center text-cyan-400 font-black text-xl">
+                        02
+                    </div>
+
+                    <div class="glass rounded-2xl p-7">
+
+                        <h3 class="text-2xl font-bold text-white">
+                            Image Processing
+                        </h3>
+
+                        <p class="text-slate-400 mt-3 leading-relaxed">
+                            Python and OpenCV are used as part of the computer
+                            vision workflow for preparing and handling the
+                            inspection images.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Step 3 -->
+                <div class="relative md:pl-24">
+
+                    <div class="hidden md:flex absolute left-0 top-0 w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-400/20 items-center justify-center text-purple-400 font-black text-xl">
+                        03
+                    </div>
+
+                    <div class="glass rounded-2xl p-7">
+
+                        <h3 class="text-2xl font-bold text-white">
+                            YOLO26n Inference
+                        </h3>
+
+                        <p class="text-slate-400 mt-3 leading-relaxed">
+                            The trained YOLO26n object-detection model processes
+                            the image and predicts defect classes, locations
+                            and confidence scores.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Step 4 -->
+                <div class="relative md:pl-24">
+
+                    <div class="hidden md:flex absolute left-0 top-0 w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-400/20 items-center justify-center text-emerald-400 font-black text-xl">
+                        04
+                    </div>
+
+                    <div class="glass rounded-2xl p-7">
+
+                        <h3 class="text-2xl font-bold text-white">
+                            Bounding Box Localization
+                        </h3>
+
+                        <p class="text-slate-400 mt-3 leading-relaxed">
+                            Each detected defect is localized using a bounding
+                            box, allowing the inspection system to identify
+                            exactly where the defect occurs on the PCB.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Step 5 -->
+                <div class="relative md:pl-24">
+
+                    <div class="hidden md:flex absolute left-0 top-0 w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-400/20 items-center justify-center text-amber-400 font-black text-xl">
+                        05
+                    </div>
+
+                    <div class="glass rounded-2xl p-7">
+
+                        <h3 class="text-2xl font-bold text-white">
+                            Inspection Result
+                        </h3>
+
+                        <p class="text-slate-400 mt-3 leading-relaxed">
+                            The final output contains the defect class,
+                            bounding-box location and confidence score,
+                            providing an interpretable automated inspection result.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- MODEL ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="py-28 bg-slate-950/70">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="text-center">
+
+            <p class="text-cyan-400 font-semibold uppercase tracking-widest text-sm">
+                05 — AI Architecture
+            </p>
+
+            <h2 class="text-4xl md:text-5xl font-black text-white mt-4">
+                How the detection model works
+            </h2>
+
+        </div>
+
+
+        <div class="mt-16 flex flex-col md:flex-row items-center justify-center gap-4">
+
+            <div class="glass rounded-2xl p-7 w-full md:w-52 text-center">
+
+                <div class="text-blue-400 font-black text-3xl">
+                    IMG
+                </div>
+
+                <h3 class="font-bold text-white mt-3">
+                    Input Image
+                </h3>
+
+                <p class="text-xs text-slate-500 mt-2">
+                    PCB inspection frame
+                </p>
+
+            </div>
+
+
+            <div class="text-3xl text-slate-600 rotate-90 md:rotate-0">
+                →
+            </div>
+
+
+            <div class="glass rounded-2xl p-7 w-full md:w-52 text-center">
+
+                <div class="text-cyan-400 font-black text-3xl">
+                    CNN
+                </div>
+
+                <h3 class="font-bold text-white mt-3">
+                    Feature Extraction
+                </h3>
+
+                <p class="text-xs text-slate-500 mt-2">
+                    Visual feature learning
+                </p>
+
+            </div>
+
+
+            <div class="text-3xl text-slate-600 rotate-90 md:rotate-0">
+                →
+            </div>
+
+
+            <div class="glass rounded-2xl p-7 w-full md:w-52 text-center">
+
+                <div class="text-purple-400 font-black text-3xl">
+                    DET
+                </div>
+
+                <h3 class="font-bold text-white mt-3">
+                    YOLO26n
+                </h3>
+
+                <p class="text-xs text-slate-500 mt-2">
+                    Object detection
+                </p>
+
+            </div>
+
+
+            <div class="text-3xl text-slate-600 rotate-90 md:rotate-0">
+                →
+            </div>
+
+
+            <div class="glass rounded-2xl p-7 w-full md:w-52 text-center">
+
+                <div class="text-emerald-400 font-black text-3xl">
+                    ✓
+                </div>
+
+                <h3 class="font-bold text-white mt-3">
+                    Detection
+                </h3>
+
+                <p class="text-xs text-slate-500 mt-2">
+                    Class + box + confidence
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- RESULTS -->
+<!-- ========================================================= -->
+
+<section id="results" class="py-28">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="text-center max-w-3xl mx-auto">
+
+            <p class="text-emerald-400 font-semibold uppercase tracking-widest text-sm">
+                06 — Model Performance
+            </p>
+
+            <h2 class="text-4xl md:text-5xl font-black text-white mt-4">
+                Performance that makes
+                <span class="text-gradient">inspection measurable</span>
+            </h2>
+
+            <p class="text-slate-400 mt-5">
+                Evaluation was performed using unseen PCB test images
+                containing annotated defects.
+            </p>
+
+        </div>
+
+
+        <div class="grid md:grid-cols-3 gap-6 mt-14">
+
+            <!-- Precision -->
+            <div class="glass glow rounded-3xl p-8 text-center">
+
+                <p class="text-sm uppercase tracking-widest text-slate-500">
+                    Precision
+                </p>
+
+                <p class="text-6xl font-black text-white mt-5">
+                    96.4<span class="text-2xl text-blue-400">%</span>
+                </p>
+
+                <div class="w-full h-2 bg-slate-800 rounded-full mt-7">
+                    <div class="h-full bg-blue-400 rounded-full"
+                         style="width:96.4%"></div>
+                </div>
+
+                <p class="text-sm text-slate-500 mt-5">
+                    High proportion of predicted defects were correct.
+                </p>
+
+            </div>
+
+
+            <!-- Recall -->
+            <div class="glass glow rounded-3xl p-8 text-center">
+
+                <p class="text-sm uppercase tracking-widest text-slate-500">
+                    Recall
+                </p>
+
+                <p class="text-6xl font-black text-white mt-5">
+                    92.6<span class="text-2xl text-cyan-400">%</span>
+                </p>
+
+                <div class="w-full h-2 bg-slate-800 rounded-full mt-7">
+                    <div class="h-full bg-cyan-400 rounded-full"
+                         style="width:92.6%"></div>
+                </div>
+
+                <p class="text-sm text-slate-500 mt-5">
+                    Strong ability to identify actual defects.
+                </p>
+
+            </div>
+
+
+            <!-- mAP -->
+            <div class="glass glow rounded-3xl p-8 text-center">
+
+                <p class="text-sm uppercase tracking-widest text-slate-500">
+                    mAP@50
+                </p>
+
+                <p class="text-6xl font-black text-white mt-5">
+                    97.9<span class="text-2xl text-purple-400">%</span>
+                </p>
+
+                <div class="w-full h-2 bg-slate-800 rounded-full mt-7">
+                    <div class="h-full bg-purple-400 rounded-full"
+                         style="width:97.9%"></div>
+                </div>
+
+                <p class="text-sm text-slate-500 mt-5">
+                    Strong object-detection performance at IoU 0.50.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- Test summary -->
+        <div class="glass rounded-2xl mt-8 p-7 flex flex-col md:flex-row justify-between gap-6">
+
+            <div>
+                <p class="text-xs uppercase tracking-widest text-slate-500">
+                    Evaluation Set
+                </p>
+
+                <p class="text-xl font-bold text-white mt-2">
+                    150 Unseen PCB Images
+                </p>
+            </div>
+
+            <div>
+                <p class="text-xs uppercase tracking-widest text-slate-500">
+                    Annotated Defects
+                </p>
+
+                <p class="text-xl font-bold text-white mt-2">
+                    1,005
+                </p>
+            </div>
+
+            <div>
+                <p class="text-xs uppercase tracking-widest text-slate-500">
+                    Detection Output
+                </p>
+
+                <p class="text-xl font-bold text-white mt-2">
+                    Class + Bounding Box + Confidence
+                </p>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- TECHNOLOGY -->
+<!-- ========================================================= -->
+
+<section id="technology" class="py-28 bg-slate-950/70">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="grid lg:grid-cols-2 gap-16">
+
+            <div>
+
+                <p class="text-blue-400 font-semibold uppercase tracking-widest text-sm">
+                    07 — Technology Stack
+                </p>
+
+                <h2 class="text-4xl md:text-5xl font-black text-white mt-4">
+                    Built around
+                    <span class="text-gradient">computer vision</span>
+                </h2>
+
+                <p class="text-slate-400 mt-6 text-lg leading-relaxed">
+                    The project combines programming, computer vision and
+                    deep-learning based object detection into an automated
+                    inspection workflow.
+                </p>
+
+            </div>
+
+
+            <div class="grid grid-cols-2 gap-4">
+
+                <div class="glass rounded-2xl p-6">
+                    <div class="text-3xl font-black text-yellow-400">Py</div>
+                    <h3 class="font-bold text-white mt-4">Python</h3>
+                    <p class="text-sm text-slate-500 mt-2">
+                        Core development
+                    </p>
+                </div>
+
+                <div class="glass rounded-2xl p-6">
+                    <div class="text-3xl font-black text-blue-400">CV</div>
+                    <h3 class="font-bold text-white mt-4">OpenCV</h3>
+                    <p class="text-sm text-slate-500 mt-2">
+                        Image processing
+                    </p>
+                </div>
+
+                <div class="glass rounded-2xl p-6">
+                    <div class="text-3xl font-black text-purple-400">YOLO</div>
+                    <h3 class="font-bold text-white mt-4">YOLO26n</h3>
+                    <p class="text-sm text-slate-500 mt-2">
+                        Object detection
+                    </p>
+                </div>
+
+                <div class="glass rounded-2xl p-6">
+                    <div class="text-3xl font-black text-orange-400">PT</div>
+                    <h3 class="font-bold text-white mt-4">PyTorch</h3>
+                    <p class="text-sm text-slate-500 mt-2">
+                        Deep learning
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- INDUSTRIAL APPLICATION -->
+<!-- ========================================================= -->
+
+<section class="py-28">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <div class="text-center">
+
+            <p class="text-amber-400 font-semibold uppercase tracking-widest text-sm">
+                08 — Industrial Relevance
+            </p>
+
+            <h2 class="text-4xl md:text-5xl font-black text-white mt-4">
+                From academic project to
+                <span class="text-gradient">factory application</span>
+            </h2>
+
+        </div>
+
+
+        <div class="grid md:grid-cols-4 gap-5 mt-14">
+
+            <div class="glass rounded-2xl p-6 text-center">
+
+                <div class="text-4xl">🔍</div>
+
+                <h3 class="font-bold text-white mt-5">
+                    Automated Inspection
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-3">
+                    Support automated visual quality checks.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 text-center">
+
+                <div class="text-4xl">⚡</div>
+
+                <h3 class="font-bold text-white mt-5">
+                    Faster Screening
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-3">
+                    Reduce dependence on purely manual inspection.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 text-center">
+
+                <div class="text-4xl">📍</div>
+
+                <h3 class="font-bold text-white mt-5">
+                    Defect Localization
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-3">
+                    Bounding boxes show exactly where defects occur.
+                </p>
+
+            </div>
+
+
+            <div class="glass rounded-2xl p-6 text-center">
+
+                <div class="text-4xl">📊</div>
+
+                <h3 class="font-bold text-white mt-5">
+                    Quality Analytics
+                </h3>
+
+                <p class="text-sm text-slate-500 mt-3">
+                    Detection results can support manufacturing quality data.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PROJECT HIGHLIGHTS -->
+<!-- ========================================================= -->
+
+<section class="py-28 bg-slate-950/70">
+
+    <div class="max-w-5xl mx-auto px-6">
+
+        <div class="glass rounded-3xl p-8 md:p-12 glow">
+
+            <p class="text-cyan-400 font-semibold uppercase tracking-widest text-sm">
+                09 — Project Highlights
+            </p>
+
+            <h2 class="text-4xl font-black text-white mt-4">
+                What I built
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-x-12 gap-y-6 mt-10">
+
+                <div class="flex gap-4">
+
+                    <div class="text-emerald-400 text-xl">✓</div>
+
+                    <div>
+                        <h3 class="font-bold text-white">
+                            AI-based AOI pipeline
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            Developed an automated PCB defect detection workflow
+                            using computer vision and deep learning.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="flex gap-4">
+
+                    <div class="text-emerald-400 text-xl">✓</div>
+
+                    <div>
+                        <h3 class="font-bold text-white">
+                            Six-class detection
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            Classified Open, Short, Mousebite, Spur, Pin-hole
+                            and Spurious Copper defects.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="flex gap-4">
+
+                    <div class="text-emerald-400 text-xl">✓</div>
+
+                    <div>
+                        <h3 class="font-bold text-white">
+                            Bounding-box localization
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            Localized detected defects rather than only
+                            predicting whether a PCB was defective.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="flex gap-4">
+
+                    <div class="text-emerald-400 text-xl">✓</div>
+
+                    <div>
+                        <h3 class="font-bold text-white">
+                            Confidence-based results
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            Detection output includes confidence scores
+                            for model predictions.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="flex gap-4">
+
+                    <div class="text-emerald-400 text-xl">✓</div>
+
+                    <div>
+                        <h3 class="font-bold text-white">
+                            Unseen-data evaluation
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            Evaluated the system on 150 unseen test images
+                            containing 1,005 annotated defects.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="flex gap-4">
+
+                    <div class="text-emerald-400 text-xl">✓</div>
+
+                    <div>
+                        <h3 class="font-bold text-white">
+                            Strong detection metrics
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            Achieved 96.4% precision, 92.6% recall and
+                            97.9% mAP@50.
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- FINAL SUMMARY -->
+<!-- ========================================================= -->
+
+<section class="py-28 relative overflow-hidden">
+
+    <div class="absolute inset-0 grid-bg opacity-40"></div>
+
+    <div class="relative max-w-4xl mx-auto px-6 text-center">
+
+        <div class="inline-flex px-4 py-2 rounded-full border border-blue-400/20 bg-blue-400/5 text-blue-300 text-sm">
+            Computer Vision × Manufacturing
+        </div>
+
+        <h2 class="text-4xl md:text-6xl font-black text-white mt-7 leading-tight">
+            Making PCB quality inspection
+            <span class="text-gradient">
+                smarter with AI.
+            </span>
+        </h2>
+
+        <p class="text-slate-400 text-lg mt-7 leading-relaxed">
+            This project demonstrates how deep-learning based object
+            detection can be applied to a real manufacturing quality
+            problem — transforming PCB images into actionable inspection
+            results.
+        </p>
+
+        <div class="flex justify-center flex-wrap gap-3 mt-10">
+
+            <span class="px-4 py-2 rounded-lg bg-slate-900 border border-slate-800">
+                YOLO26n
+            </span>
+
+            <span class="px-4 py-2 rounded-lg bg-slate-900 border border-slate-800">
+                Python
+            </span>
+
+            <span class="px-4 py-2 rounded-lg bg-slate-900 border border-slate-800">
+                OpenCV
+            </span>
+
+            <span class="px-4 py-2 rounded-lg bg-slate-900 border border-slate-800">
+                PyTorch
+            </span>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- FOOTER -->
+<!-- ========================================================= -->
+
+<footer class="border-t border-slate-800 py-10">
+
+    <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between gap-5">
+
+        <div>
+            <p class="font-bold text-white">
+                AI-Based PCB Defect Detection
+            </p>
+
+            <p class="text-sm text-slate-600 mt-1">
+                Computer Vision • Automated Optical Inspection
+            </p>
+        </div>
+
+        <div class="text-sm text-slate-600">
+            Built by Joel Singh
+        </div>
+
+    </div>
+
+</footer>
+
+
+<!-- ========================================================= -->
+<!-- SMALL INTERACTION -->
+<!-- ========================================================= -->
+
+<script>
+
+    // Reveal elements when they enter the viewport
+    const observer = new IntersectionObserver(
+        (entries) => {
+
+            entries.forEach(entry => {
+
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("animate-fade-up");
+                }
+
+            });
+
+        },
+        {
+            threshold: 0.12
+        }
+    );
+
+    document.querySelectorAll(".glass").forEach(el => {
+        observer.observe(el);
+    });
+
+
+    // Smooth mobile navigation handling
+    document.querySelectorAll("a[href^='#']").forEach(link => {
+
+        link.addEventListener("click", function(e) {
+
+            const target = document.querySelector(
+                this.getAttribute("href")
+            );
+
+            if (target) {
+
+                e.preventDefault();
+
+                target.scrollIntoView({
+                    behavior: "smooth"
+                });
+
+            }
+
+        });
+
+    });
+
+</script>
+
+</body>
+</html>
