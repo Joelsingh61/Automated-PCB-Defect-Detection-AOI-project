@@ -71,11 +71,8 @@ mAP@50	97.9%
 mAP@50–95	74.6%
 Test Images	150
 Defect Instances	1,005
-Per-Class Performance
-Defect	Precision	Recall	mAP@50	mAP@50–95
-Open	96.0%	95.2%	98.3%	66.2%
-Short	98.0%	89.8%	96.8%	66.0%
-Mousebite	96.6%	90.6%	97.9%	72.6%
-Spur	90.2%	90.3%	96.2%	70.9%
-Pin-hole	99.7%	95.3%	99.2%	88.4%
-Spurious Copper	97.9%	94.3%	98.9%	83.7%
+
+Confusion Matrix
+
+<img width="3000" height="2250" alt="image" src="https://github.com/user-attachments/assets/2a964a4f-d5f6-4286-8eda-755c66b7f07f" />
+
